@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>リコリコ 駆け抜け判定ツール</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f5f5f7;
+    --card: #ffffff;
+    --border: #ddd;
+    --text: #1a1a1a;
+    --muted: #666;
+    --accent: #e0457b;
+    --accent-dark: #c23164;
+    --ok: #1a8a4a;
+    --ok-bg: #e6f6ec;
+    --ng: #b0281f;
+    --ng-bg: #fbeaea;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17181a;
+      --card: #232527;
+      --border: #3a3c3f;
+      --text: #eee;
+      --muted: #aaa;
+      --ok-bg: #123822;
+      --ng-bg: #3a1a17;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 24px 16px 80px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 560px; margin: 0 auto; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+  .card h2 { font-size: 15px; margin: 0 0 4px; }
+  .card .desc { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+  input[type=number] {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 16px;
+    font-family: inherit;
+  }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .result-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+  .result-row:last-child { border-bottom: none; }
+  .result-row .val { font-weight: 700; font-size: 16px; }
+  .verdict {
+    margin-top: 14px;
+    padding: 16px;
+    border-radius: 10px;
+    text-align: center;
+    font-size: 17px;
+    font-weight: 700;
+  }
+  .verdict.ok { background: var(--ok-bg); color: var(--ok); }
+  .verdict.ng { background: var(--ng-bg); color: var(--ng); }
+  .verdict .range { font-size: 12px; font-weight: 400; margin-top: 6px; opacity: .85; }
+  details { margin-top: 14px; font-size: 13px; color: var(--muted); }
+  details summary { cursor: pointer; }
+  details .formula { margin-top: 8px; white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: 12px; }
+  .const-row { display: flex; gap: 8px; align-items: center; }
+  .const-row label { flex: 1; margin: 0; }
+  .const-row input { width: 90px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>リコリコ 駆け抜け判定ツール</h1>
+  <div class="sub">スマスロ リコリス・リコイルの液晶ゲーム数から、リコリスラッシュ駆け抜け後かどうかを自動判定します。</div>
+
+  <div class="card">
+    <h2>① 現在までのハマりG数</h2>
+    <div class="desc">リコリスラッシュ初当り（RB信号）以降のART信号のスタート数を全部足した値</div>
+    <input type="number" id="hamari" placeholder="例：315" inputmode="numeric">
+  </div>
+
+  <div class="card">
+    <h2>② CZに使ったゲーム数</h2>
+    <div class="desc">RB信号以降のART信号（CZ）の回数 × 8G の合計値</div>
+    <input type="number" id="czGames" placeholder="例：24" inputmode="numeric">
+  </div>
+
+  <div class="card">
+    <h2>③ RB信号後、1回目のART表示のG数</h2>
+    <div class="desc">RB表示後の1回目のART表示を「リコリスラッシュ駆け抜け終了→通常時1G目にCZ当選」とみなして計算します（この値 − 1 を使用）</div>
+    <input type="number" id="firstArt" placeholder="例：56" inputmode="numeric">
+  </div>
+
+  <div class="card">
+    <h2>④ 現在の液晶ゲーム数</h2>
+    <div class="desc">今まさに表示されている液晶のゲーム数</div>
+    <input type="number" id="current" placeholder="例：250" inputmode="numeric">
+  </div>
+
+  <div class="card" id="resultCard" style="display:none">
+    <h2>計算結果</h2>
+    <div class="result-row"><span>理論上の最大G数（駆け抜け時）</span><span class="val" id="maxVal">-</span></div>
+    <div class="result-row"><span>理論上の最小G数（駆け抜け時）</span><span class="val" id="minVal">-</span></div>
+    <div class="verdict" id="verdict"></div>
+
+    <details>
+      <summary>計算式を見る</summary>
+      <div class="formula" id="formulaText"></div>
+    </details>
+
+    <details>
+      <summary>固定値（詳細設定）</summary>
+      <div class="const-row" style="margin-top:8px">
+        <label for="constEpisode">突入前エピソード最短G数</label>
+        <input type="number" id="constEpisode" value="7">
+      </div>
+      <div class="const-row" style="margin-top:8px">
+        <label for="constKakenuke">駆け抜け時最短G数</label>
+        <input type="number" id="constKakenuke" value="20">
+      </div>
+      <div class="hint">通常はこのままでOKです。台や仕様変更で理論値が変わる場合のみ調整してください。</div>
+    </details>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const inputs = ['hamari', 'czGames', 'firstArt', 'current', 'constEpisode', 'constKakenuke'];
+
+function calc() {
+  const hamari = parseFloat($('hamari').value);
+  const czGames = parseFloat($('czGames').value);
+  const firstArt = parseFloat($('firstArt').value);
+  const current = parseFloat($('current').value);
+  const episodeMin = parseFloat($('constEpisode').value);
+  const kakenukeMin = parseFloat($('constKakenuke').value);
+
+  if ([hamari, czGames, firstArt].some(v => isNaN(v))) {
+    $('resultCard').style.display = 'none';
+    return;
+  }
+
+  const maxG = hamari - czGames - episodeMin - kakenukeMin;
+  const minG = hamari - czGames - (firstArt - 1);
+  const lo = Math.min(maxG, minG);
+  const hi = Math.max(maxG, minG);
+
+  $('resultCard').style.display = 'block';
+  $('maxVal').textContent = `${maxG}G`;
+  $('minVal').textContent = `${minG}G`;
+
+  $('formulaText').textContent =
+`③最大G数 = ①(${hamari}) - ②(${czGames}) - 突入前最短(${episodeMin}) - 駆け抜け最短(${kakenukeMin}) = ${maxG}G
+④最小G数 = ①(${hamari}) - ②(${czGames}) - (${firstArt} - 1) = ${minG}G`;
+
+  const verdictEl = $('verdict');
+  if (isNaN(current)) {
+    verdictEl.className = 'verdict';
+    verdictEl.style.background = 'transparent';
+    verdictEl.style.color = 'var(--muted)';
+    verdictEl.innerHTML = `現在の液晶ゲーム数を入力すると判定します<div class="range">判定範囲：${lo}G 〜 ${hi}G</div>`;
+    return;
+  }
+
+  const isKakenuke = current >= lo && current <= hi;
+  verdictEl.className = 'verdict ' + (isKakenuke ? 'ok' : 'ng');
+  verdictEl.innerHTML = isKakenuke
+    ? `✅ 駆け抜け後と判断できます<div class="range">現在 ${current}G は判定範囲 ${lo}G〜${hi}G の間です</div>`
+    : `❌ 駆け抜けではないと判断できます<div class="range">現在 ${current}G は判定範囲 ${lo}G〜${hi}G の外です</div>`;
+}
+
+inputs.forEach(id => $(id).addEventListener('input', calc));
+</script>
+</body>
+</html>
